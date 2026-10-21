@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050610">
+<meta name="description" content="Lumen — платформа, которая превращает данные в живые 3D-сцены.">
+<title>Lumen — данные в объёме</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    fontFamily: { sans: ['Manrope', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    colors: { ink: '#050610', neon: '#5CE1FF', violet: '#8B6CFF' }
+  } }
+};
+</script>
+<style>
+  html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+  body { background: #050610; }
+  :focus-visible { outline: 2px solid #5CE1FF; outline-offset: 3px; border-radius: 8px; }
+
+  /* Hero fallback glow (visible even if WebGL is unavailable) */
+  .hero-glow {
+    background:
+      radial-gradient(60% 50% at 75% 45%, rgba(92,225,255,.16), transparent 70%),
+      radial-gradient(50% 45% at 20% 80%, rgba(139,108,255,.18), transparent 70%);
+  }
+  .metal-text { background: linear-gradient(180deg, #fff 20%, #8e99b5 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* Buttons */
+  .btn { transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease, border-color .2s ease; }
+  .btn:hover { transform: translateY(-2px) scale(1.03); }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: linear-gradient(120deg, #5CE1FF, #8B6CFF); color: #050610; box-shadow: 0 0 28px -4px rgba(92,225,255,.55); }
+  .btn-primary:hover { box-shadow: 0 0 44px -2px rgba(139,108,255,.75); }
+  .btn-ghost { border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.03); }
+  .btn-ghost:hover { border-color: rgba(92,225,255,.6); background: rgba(92,225,255,.08); }
+
+  /* Glass cards with cursor spotlight */
+  .card { position: relative; overflow: hidden; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.09);
+          -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+          transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+  .card::before { content: ""; position: absolute; inset: 0; opacity: 0; transition: opacity .25s ease; pointer-events: none;
+          background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%), rgba(92,225,255,.15), transparent 60%); }
+  .card > * { position: relative; }
+  .card:hover { transform: translateY(-4px); border-color: rgba(92,225,255,.45);
+          box-shadow: 0 0 0 1px rgba(92,225,255,.12), 0 24px 60px -24px rgba(92,225,255,.4); }
+  .card:hover::before { opacity: 1; }
+  .icon { transition: transform .25s ease, color .25s ease; }
+  .card:hover .icon { transform: scale(1.12) rotate(-4deg); color: #5CE1FF; }
+
+  /* Nav links */
+  .nav-link { position: relative; transition: color .2s ease; }
+  .nav-link::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 1px; background: #5CE1FF;
+          transform: scaleX(0); transform-origin: left; transition: transform .25s ease; box-shadow: 0 0 8px #5CE1FF; }
+  .nav-link:hover { color: #fff; }
+  .nav-link:hover::after { transform: scaleX(1); }
+
+  /* One orchestrated entrance for the hero */
+  @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+  .rise { opacity: 0; animation: rise .8s cubic-bezier(.2,.7,.2,1) forwards; }
+  .d1 { animation-delay: .1s } .d2 { animation-delay: .25s } .d3 { animation-delay: .4s } .d4 { animation-delay: .55s }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .rise { animation: none; opacity: 1; }
+    .btn, .card, .icon { transition: none; }
+  }
+</style>
+</head>
+
+<body class="font-sans text-slate-300 antialiased selection:bg-neon/30">
+
+<!-- NAVBAR -->
+<header id="nav" class="fixed inset-x-0 top-0 z-50 border-b border-transparent transition-colors duration-300" style="padding-top: env(safe-area-inset-top, 0px)">
+  <nav class="mx-auto flex h-16 max-w-6xl items-center justify-between px-5" aria-label="Основная навигация">
+    <a href="#top" class="flex items-center gap-2 text-lg font-extrabold tracking-tight text-white">
+      <span class="inline-block h-3 w-3 rounded-full bg-neon shadow-[0_0_14px_#5CE1FF]"></span>Lumen
+    </a>
+    <div class="hidden items-center gap-8 text-sm font-medium md:flex">
+      <a class="nav-link" href="#features">Возможности</a>
+      <a class="nav-link" href="#contact">Контакты</a>
+      <a class="btn btn-primary rounded-full px-5 py-2 text-sm font-semibold" href="#contact">Начать</a>
+    </div>
+    <button id="menuBtn" class="rounded-lg p-2 text-white md:hidden" aria-label="Меню" aria-expanded="false" aria-controls="menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+  </nav>
+  <div id="menu" class="hidden border-t border-white/10 bg-ink/90 px-5 py-4 backdrop-blur-xl md:hidden">
+    <a class="block py-3 font-medium" href="#features">Возможности</a>
+    <a class="block py-3 font-medium" href="#contact">Контакты</a>
+  </div>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section id="hero" class="hero-glow relative flex min-h-[100svh] items-start overflow-hidden md:items-center">
+    <canvas id="scene" class="absolute inset-0 h-full w-full" aria-hidden="true"></canvas>
+    <div class="relative z-10 mx-auto w-full max-w-6xl px-5 pb-24 pt-32 md:pb-0 md:pt-0">
+      <div class="max-w-xl">
+        <p class="rise d1 mb-5 inline-block rounded-full border border-neon/30 bg-neon/10 px-4 py-1.5 text-sm text-neon">Новая версия 3.0 уже доступна</p>
+        <h1 class="rise d2 metal-text text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">Данные, которые можно потрогать</h1>
+        <p class="rise d3 mt-6 max-w-md text-lg leading-relaxed text-slate-400">Lumen превращает потоки метрик в живые 3D-сцены. Быстро, плавно и в любом браузере.</p>
+        <div class="rise d4 mt-9 flex flex-wrap gap-3">
+          <a class="btn btn-primary rounded-full px-7 py-3.5 font-semibold" href="#contact">Попробовать бесплатно</a>
+          <a class="btn btn-ghost rounded-full px-7 py-3.5 font-semibold text-white" href="#features">Смотреть возможности</a>
+        </div>
+        <p class="rise d4 mt-8 text-sm text-slate-500">Подвигайте мышью или пальцем: сцена откликнется.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="relative mx-auto max-w-6xl px-5 py-24">
+    <div class="mb-14 max-w-2xl">
+      <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Всё, чтобы данные заговорили</h2>
+      <p class="mt-4 text-slate-400">Шесть причин, почему команды переходят на Lumen.</p>
+    </div>
+    <div id="grid" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <article class="card rounded-3xl p-7">
+        <svg class="icon mb-5 text-violet" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>
+        <h3 class="mb-2 text-lg font-semibold text-white">Живая 3D-аналитика</h3>
+        <p class="text-sm leading-relaxed text-slate-400">Графики и сети связей в объёме, которые обновляются в реальном времени.</p>
+      </article>
+      <article class="card rounded-3xl p-7">
+        <svg class="icon mb-5 text-violet" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z"/></svg>
+        <h3 class="mb-2 text-lg font-semibold text-white">60 кадров без компромиссов</h3>
+        <p class="text-sm leading-relaxed text-slate-400">Лёгкая геометрия и экономичное освещение: плавно даже на смартфоне.</p>
+      </article>
+      <article class="card rounded-3xl p-7">
+        <svg class="icon mb-5 text-violet" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 01-12 0V8zM12 17v4"/></svg>
+        <h3 class="mb-2 text-lg font-semibold text-white">Любой источник данных</h3>
+        <p class="text-sm leading-relaxed text-slate-400">API, таблицы и базы данных подключаются за несколько минут, без кода.</p>
+      </article>
+      <article class="card rounded-3xl p-7">
+        <svg class="icon mb-5 text-violet" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5.5a3 3 0 010 5.5M18 14.5c1.8.8 3 2.5 3 5.5"/></svg>
+        <h3 class="mb-2 text-lg font-semibold text-white">Работа в команде</h3>
+        <p class="text-sm leading-relaxed text-slate-400">Общие сцены, комментарии и роли доступа для каждого участника.</p>
+      </article>
+      <article class="card rounded-3xl p-7">
+        <svg class="icon mb-5 text-violet" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6l7-3z"/></svg>
+        <h3 class="mb-2 text-lg font-semibold text-white">Безопасность по умолчанию</h3>
+        <p class="text-sm leading-relaxed text-slate-400">Шифрование данных и журнал действий включены в каждом тарифе.</p>
+      </article>
+      <article class="card rounded-3xl p-7">
+        <svg class="icon mb-5 text-violet" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/></svg>
+        <h3 class="mb-2 text-lg font-semibold text-white">Встраивание на сайт</h3>
+        <p class="text-sm leading-relaxed text-slate-400">Один скрипт, и готовая сцена работает на вашей странице.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section id="contact" class="mx-auto max-w-6xl px-5 pb-24">
+    <div class="card rounded-[2rem] p-8 sm:p-12">
+      <div class="grid items-center gap-10 lg:grid-cols-2">
+        <div>
+          <h2 class="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Запустим вашу сцену за неделю</h2>
+          <p class="mt-4 max-w-md text-slate-400">Расскажите о задаче, и мы покажем рабочий прототип на ваших данных.</p>
+          <a class="btn btn-primary mt-8 inline-block rounded-full px-7 py-3.5 font-semibold" href="mailto:hello@lumen.example">Написать нам</a>
+        </div>
+        <ul class="grid gap-3 text-sm">
+          <li><a class="btn btn-ghost flex items-center justify-between rounded-2xl px-5 py-4 text-white" href="mailto:hello@lumen.example"><span class="text-slate-400">Почта</span>hello@lumen.example</a></li>
+          <li><a class="btn btn-ghost flex items-center justify-between rounded-2xl px-5 py-4 text-white" href="https://t.me/lumen_app" target="_blank" rel="noopener"><span class="text-slate-400">Telegram</span>@lumen_app</a></li>
+          <li><a class="btn btn-ghost flex items-center justify-between rounded-2xl px-5 py-4 text-white" href="tel:+70000000000"><span class="text-slate-400">Телефон</span>+7 000 000 00 00</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="border-t border-white/10 py-8 text-sm text-slate-500" style="padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem)">
+  <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5">
+    <span>© 2026 Lumen. Все права защищены.</span>
+    <a class="nav-link" href="#top">Наверх</a>
+  </div>
+</footer>
+
+<!-- Three.js (UMD, pinned) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script type="module">
+/* ---------- UI ---------- */
+const initNav = () => {
+  const nav = document.getElementById('nav'), btn = document.getElementById('menuBtn'), menu = document.getElementById('menu');
+  const onScroll = () => {
+    const solid = scrollY > 24;
+    nav.classList.toggle('bg-ink/70', solid);
+    nav.classList.toggle('backdrop-blur-xl', solid);
+    nav.classList.toggle('border-white/10', solid);
+  };
+  addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  btn.addEventListener('click', () => {
+    const open = menu.classList.toggle('hidden') === false;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+  menu.addEventListener('click', e => { if (e.target.closest('a')) { menu.classList.add('hidden'); btn.setAttribute('aria-expanded', 'false'); } });
+};
+
+const initCards = () => {
+  document.getElementById('grid').addEventListener('pointermove', e => {
+    const c = e.target.closest('.card'); if (!c) return;
+    const r = c.getBoundingClientRect();
+    c.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+    c.style.setProperty('--my', (e.clientY - r.top) + 'px');
+  });
+};
+
+/* ---------- 3D scene ---------- */
+const glowTexture = () => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0, 'rgba(92,225,255,.55)'); grd.addColorStop(.4, 'rgba(139,108,255,.2)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+};
+
+const buildScene = () => {
+  const root = new THREE.Group();
+
+  const core = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.15, 1),
+    new THREE.MeshStandardMaterial({ color: 0x1a2238, metalness: .85, roughness: .28, flatShading: true, emissive: 0x0b3a52, emissiveIntensity: .6 })
+  );
+  const shell = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(1.75, 2),
+    new THREE.MeshBasicMaterial({ color: 0x5ce1ff, wireframe: true, transparent: true, opacity: .2 })
+  );
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), blending: THREE.AdditiveBlending, depthWrite: false }));
+  glow.scale.setScalar(7);
+
+  const ring = (radius, color, tiltX, tiltY, satColor) => {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.TorusGeometry(radius, .012, 8, 160), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .8 })));
+    const sat = new THREE.Mesh(new THREE.SphereGeometry(.075, 12, 12), new THREE.MeshBasicMaterial({ color: satColor }));
+    sat.position.x = radius; g.add(sat);
+    g.rotation.set(tiltX, tiltY, 0);
+    const spin = new THREE.Group(); spin.add(g);
+    return { spin, tilt: g };
+  };
+  const r1 = ring(2.5, 0x8b6cff, 1.2, .3, 0xffffff);
+  const r2 = ring(2.95, 0x5ce1ff, .5, -.6, 0xffffff);
+
+  root.add(glow, core, shell, r1.spin, r2.spin);
+  return { root, core, shell, r1: r1.spin, r2: r2.spin };
+};
+
+const buildParticles = (count) => {
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = 4 + Math.random() * 8, a = Math.random() * Math.PI * 2, b = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(b) * Math.cos(a);
+    pos[i * 3 + 1] = r * Math.sin(b) * Math.sin(a);
+    pos[i * 3 + 2] = r * Math.cos(b);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  return new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xaee9ff, size: .035, transparent: true, opacity: .8, blending: THREE.AdditiveBlending, depthWrite: false }));
+};
+
+const initScene = () => {
+  const canvas = document.getElementById('scene'), host = document.getElementById('hero');
+  if (!window.THREE) return;
+  const small = matchMedia('(max-width: 767px)').matches;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: !small, powerPreference: 'high-performance' }); }
+  catch (e) { canvas.style.display = 'none'; return; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, small ? 1.5 : 2));
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, .1, 60);
+  const parts = buildScene(), dust = buildParticles(small ? 350 : 800);
+  scene.add(parts.root, dust);
+
+  scene.add(new THREE.AmbientLight(0xffffff, .35));
+  const key = new THREE.PointLight(0x5ce1ff, 2.2, 30); key.position.set(4, 3, 4);
+  const fill = new THREE.PointLight(0x8b6cff, 1.8, 30); fill.position.set(-4, -2, 3);
+  const rim = new THREE.DirectionalLight(0xffffff, .5); rim.position.set(0, 5, -4);
+  scene.add(key, fill, rim);
+
+  /* Layout: object sits right on wide screens, below the text on tall ones */
+  const layout = () => {
+    const w = host.clientWidth, h = host.clientHeight, aspect = w / h;
+    renderer.setSize(w, h, false);
+    camera.aspect = aspect; camera.updateProjectionMatrix();
+    const wide = aspect > 1.15;
+    camera.position.z = wide ? 9 : (aspect < .7 ? 11.5 : 10);
+    parts.root.position.set(wide ? 2.3 : 0, wide ? 0 : -2.1, 0);
+    parts.root.scale.setScalar(wide ? 1 : .85);
+  };
+  new ResizeObserver(layout).observe(host); layout();
+
+  /* Pointer parallax (smoothed) */
+  const target = { x: 0, y: 0 }, cur = { x: 0, y: 0 };
+  addEventListener('pointermove', e => {
+    target.x = (e.clientX / innerWidth) * 2 - 1;
+    target.y = (e.clientY / innerHeight) * 2 - 1;
+  }, { passive: true });
+
+  /* Loop only while hero is visible and tab is active */
+  const clock = new THREE.Clock();
+  let raf = 0, inView = true;
+  const tick = () => {
+    raf = requestAnimationFrame(tick);
+    const t = clock.getElapsedTime(), k = calm ? 0 : 1;
+    cur.x += (target.x - cur.x) * .06; cur.y += (target.y - cur.y) * .06;
+
+    parts.root.rotation.y = t * .18 * k + cur.x * .6;
+    parts.root.rotation.x = cur.y * .35;
+    parts.core.rotation.y = t * .3 * k; parts.core.rotation.x = t * .15 * k;
+    parts.shell.rotation.y = -t * .12 * k;
+    parts.r1.rotation.z = t * .5 * k; parts.r2.rotation.z = -t * .35 * k;
+    dust.rotation.y = t * .02 * k + cur.x * .08; dust.rotation.x = cur.y * .05;
+    camera.position.x += (cur.x * .5 - camera.position.x) * .05;
+    camera.position.y += (-cur.y * .35 - camera.position.y) * .05;
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+  };
+  const run = () => { if (!raf && inView && !document.hidden) { clock.start(); tick(); } };
+  const stop = () => { cancelAnimationFrame(raf); raf = 0; };
+  new IntersectionObserver(([en]) => { inView = en.isIntersecting; inView ? run() : stop(); }).observe(host);
+  document.addEventListener('visibilitychange', () => document.hidden ? stop() : run());
+  run();
+};
+
+initNav();
+initCards();
+initScene();
+</script>
+</body>
+</html>
